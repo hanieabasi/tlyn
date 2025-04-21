@@ -1,0 +1,79 @@
+# Docker-Compose Version
+
+services:
+    proj:
+        build:
+            context: ./
+            dockerfile: docker/local.Dockerfile
+
+        container_name: app
+        restart: unless-stopped
+        working_dir: /var/www
+        tty: true
+        volumes:
+            - ./:/var/www
+        ports:
+            - "80:80"
+        depends_on:
+            - postgres
+            - redis
+        networks:
+            - proj
+    # Redis
+    redis:
+        image: redis:alpine
+        container_name: redis
+        restart: unless-stopped
+        healthcheck:
+            test: [ "CMD", "redis-cli", "ping" ]
+            retries: 3
+            timeout: 5s
+        ports:
+            - "6380:6379"
+        volumes:
+            - volumes_redis:/data
+        networks:
+            - proj
+    # database
+    postgres:
+        image: postgres:latest
+        container_name: postgres
+        restart: always
+        environment:
+            POSTGRES_USER: ${DB_USERNAME}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+            POSTGRES_DATABASE: ${DB_DATABASE}
+            POSTGRES_ROOT_PASSWORD: ${DB_PASSWORD}
+            POSTGRES_ALLOW_EMPTY_PASSWORD: 1
+
+        healthcheck:
+            test: [ "CMD", "postgresadmin", "ping", "-p${DB_PASSWORD}" ]
+            retries: 3
+            timeout: 5s
+        tty: true
+        ports:
+            - "5432:5432"
+        volumes:
+            - volumes_postgres:/var/lib/postgresql/data
+
+        networks:
+            - proj
+
+    # Adminer for database management
+    adminer:
+        image: adminer
+        container_name: adminer
+        ports:
+            - "8081:8080"
+        networks:
+            - proj
+        depends_on:
+            - postgres
+
+volumes:
+    volumes_postgres:
+    volumes_redis:
+# Networks
+networks:
+    proj:
+        driver: bridge
